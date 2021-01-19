@@ -155,14 +155,14 @@ def getUsage():
     except:
         raise OSError("APS-Usage.csv")
 
-    df.columns = ["Address", "Service-Plan" , "Bill-Start-Date", "Bill-End-Date", "Billing-Days", "Total-Bought", "Billed-Amount"]
+    cols = list(df)
+    cols[5], cols[6] = cols[6], cols[5]
+    df = df[cols]
+    df.columns = ["Address", "Service-Plan" , "Bill-Start-Date", "Bill-End-Date", "Billing-Days", "Billed-Amount", "Total-Bought"]
     #Function call here to filter out multiple addresses
     if( (len(df['Address'].unique())) > 1 ):
         sortAddress(df)
 
-    cols = list(df)
-    cols[5], cols[6] = cols[6], cols[5]
-    df = df[cols]
     df["Bill-Start-Date"] = pd.to_datetime(df["Bill-Start-Date"])
     df["Bill-End-Date"] = pd.to_datetime(df["Bill-End-Date"])
     df.name = 'APSUsage'
@@ -214,14 +214,9 @@ def APSAnalysis():
     SolarExported = getSolarExported()
 
     Base = APSUsage.loc[mask]
-    SolarUsed = APSProduction['APS-Solar-Production'] - SolarExported['Solar-Exported']
-    TotalUsed = SolarUsed + APSUsage['Total-Bought']
-    SolarUsed.rename("Solar-Used", inplace=True)
-    TotalUsed.rename("Total-Used", inplace=True)
-
     adj = getPVWatts()
-    report = pd.concat([Base.reset_index(drop=True), APSProduction['APS-Solar-Production'].reset_index(drop=True), SolarUsed.reset_index(drop=True),
-        SolarExported['Solar-Exported'].reset_index(drop=True), TotalUsed.reset_index(drop=True), SEProduction['SE-Production'].reset_index(drop=True),
+    report = pd.concat([Base.reset_index(drop=True), APSProduction['APS-Solar-Production'].reset_index(drop=True),
+        SolarExported['Solar-Exported'].reset_index(drop=True), SEProduction['SE-Production'].reset_index(drop=True),
         adj.reset_index(drop=True)],axis=1)
     report.name ='report'
 
@@ -231,5 +226,9 @@ def APSAnalysis():
 APSAnalysis()
 """
 TODO
-1. More error handling
+1. Handle the case where they do not have SE monitoring
+2. Add support for APS Net Metering
+3. Add main controller class.
+4. I want to type run Analysis.py fname analysis_type, where analysis_type is
+    Net Metering or RCP
 """
