@@ -56,19 +56,12 @@ def ProductionSum(df, r):
     return p
 
 """
-This is a function that takes all of our data and prints it to the appropriatley
-named csv file
-"""
-def output(list):
-    for files in list:
-        files.to_csv(files.name + ".csv", index=False)
-"""
 This is a function that takes our usage dataframe asks the user when the system was PTO'd
 Then finds the range on our usage sheet where solar production should be present
 """
 def setRange(df):
     ##Could do some error handling here to make sure correct start date was entered
-    StartDate = raw_input("When was the system PTO? Enter as DD/MM/YYYY:\n")
+    StartDate = input("When was the system PTO? Enter as DD/MM/YYYY:\n")
     #Boolean array of true false values
     mask = df['Bill-Start-Date'] >= StartDate
     r = df[['Bill-Start-Date', 'Bill-End-Date']].loc[mask]
@@ -79,9 +72,9 @@ Function that takes our range, finds our APS-Production folder, calls gather on 
 Renames all of the columns for accessing, and then sums the production up
 according to our range
 """
-def getAPS(r):
+def getAPS(fname, r):
     try:
-        df = gather("APS-Production")
+        df = gather(fname + "\APS-Production")
     except OSError as e:
         sys.exit("The specified folder '{}' does not exist".format(e))
     except ValueError as e:
@@ -94,6 +87,7 @@ def getAPS(r):
     p = pd.Series(production, name="APS-Solar-Production")
     df = pd.concat([df.reset_index(drop=True), r.reset_index(drop=True), p], axis=1)
     df.name = "APSProduction"
+    df.to_csv(fname + "\APS-Production.csv", index=False)
     return df
 
 """
@@ -101,9 +95,9 @@ Function that takes our range, finds our SE-Production folder, calls gather on t
 Renames all of the columns for accessing, and then sums the production up
 according to our range
 """
-def getSE(r):
+def getSE(fname, r):
     try:
-        df = gather("SE-Production")
+        df = gather(fname + "\SE-Production")
     except OSError as e:
         sys.exit("The specified folder '{}' does not exist".format(e))
     except ValueError as e:
@@ -118,15 +112,16 @@ def getSE(r):
     p = pd.Series(production, name='SE-Production')
     df = pd.concat([df.reset_index(drop=True), r.reset_index(drop=True), p], axis=1)
     df.name = 'SE-Production'
+    df.to_csv(fname + "\SE-Production.csv", index=False)
     return df
 
 """
 Function that finds our Solar-Exported folder, calls gather on the sheets
 Renames all of the columns for accessing
 """
-def getSolarExported():
+def getSolarExported(fname):
     try:
-        df = gather("Solar-Exported")
+        df = gather(fname + "\Solar-Exported")
     except OSError as e:
         sys.exit("The specified folder '{}' does not exist".format(e))
     except ValueError as e:
@@ -135,25 +130,27 @@ def getSolarExported():
     df.columns = ['Solar-Exported', 'On-Peak','Off-Peak','Month','Range', 'End-Date']
     df.sort_values(by='End-Date', ascending=True, inplace=True)
     df.name = 'SolarExported'
+    df.to_csv(fname + "\Solar-Exported.csv", index=False)
     return df
 
 def sortAddress(df):
     print("We Found more than one address, which would you like to use?")
     for i in range(0, len(df['Address'].unique() )):
         print("{}: {}".format(i, df['Address'].unique()[i]))
-    choice = int(raw_input("Enter the number for the correct adddress."))
+    choice = input("Enter the number for the correct adddress.")
 
 
 """
 Function that reads our usage sheet, labels the columnds for access,
 switches Billed-Amount and Total-Bought for our report
 """
-def getUsage():
+def getUsage(fname):
     #If the file does not exist, catch and print "cannot find file"
+
     try:
-        df = pd.read_csv('APS-Usage.csv', header=None, skiprows=1, index_col=None)
+        df = pd.read_csv(fname + '\APS-Usage.csv', header=None, skiprows=1, index_col=None)
     except:
-        raise OSError("APS-Usage.csv")
+        raise OSError( fname + "\APS-Usage.csv")
 
     cols = list(df)
     cols[5], cols[6] = cols[6], cols[5]
@@ -175,60 +172,100 @@ and divide it by pvwatts.ac_annual, and call it eff. monthly = monthly * eff
 """
 def getPVWatts():
     PVWatts.api_key = 'qkk2DRRxcBpTZXA13qOGFlwouL9ZWQaLZxKjZCdd'
-    lat = float(raw_input("Enter the Lattitude of the system:"))
-    lon = float(raw_input("Enter the longitude of the system:"))
-    ratio = float(raw_input("Enter the DC/AC ratio:"))
-    estprod = int(raw_input("Enter out estimated yearly production for the system: "))
+    address = input("Enter the HO address: ")
+    ratio = float(input("Enter the DC/AC ratio:"))
+    estprod = float(input("Enter out estimated yearly production for the system: "))
 
-    numArrays = int(raw_input("Enter the number total number of unique arays:"))
+    numArrays = int(input("Enter the number total number of unique arays:"))
     monthly = [0,0,0,0,0,0,0,0,0,0,0,0]
     yearly = 0
     for i in range(0, numArrays):
-        s_c = float(raw_input("Enter the system size in kWh for array {}:".format(i)))
-        tilt = int(raw_input("Enter the tilt of array {}:".format(i)))
-        azimuth = int(raw_input("Enter the azimuth of array {}:".format(i)))
+        s_c = float(input("Enter the system size in kWh for array {}:".format(i)))
+        tilt = int(input("Enter the tilt of array {}:".format(i)))
+        azimuth = int(input("Enter the azimuth of array {}:".format(i)))
         result = PVWatts.request(system_capacity=s_c, module_type=1, array_type=1, azimuth=azimuth,
-        tilt=tilt, dataset="tmy2", losses=9,lat=lat,lon=lon,dc_ac_ratio=ratio, gcr=.4, inv_eff=99.5)
+        tilt=tilt, dataset="tmy2", losses=9,address=address,dc_ac_ratio=ratio, gcr=.4, inv_eff=99.5)
         yearly += int(result.ac_annual)
         monthly = np.add(monthly, result.ac_monthly)
 
     eff = float(estprod)/float(yearly)
     adj = monthly*eff
-    adj  = pd.Series(adj, name='adj')
-    monthly = pd.Series(monthly, name='monthly')
+    adj  = pd.Series(adj, name='adj-daily-total')
+    adj[0] = adj[0]/31
+    adj[1] = adj[1]/28
+    adj[2] = adj[2]/31
+    adj[3] = adj[3]/30
+    adj[4] = adj[4]/31
+    adj[5] = adj[5]/30
+    adj[6] = adj[6]/31
+    adj[7] = adj[7]/31
+    adj[8] = adj[8]/30
+    adj[9] = adj[9]/31
+    adj[10] = adj[10]/30
+    adj[11] = adj[11]/31
     return adj
 """
 This is the function that does a APS RCP analysis, This will be called
 by the model class once it is written.
 """
-def APSAnalysis():
+def APSAnalysis(fname):
     try:
-        APSUsage = getUsage()
+        APSUsage = getUsage(fname)
     except OSError as e:
         sys.exit("The file '{}' does not exist, or is the incorrect file type".format(e))
     Range, mask = setRange(APSUsage)
-    APSProduction = getAPS(Range)
-
+    APSProduction = getAPS(fname, Range)
+    flag = False
     #There may not always be SE-Production, how do I handle that
-    SEProduction = getSE(Range)
-    SolarExported = getSolarExported()
+    if (os.path.isdir(fname + "\SE-Production")):
+        SEProduction = getSE(fname, Range)
+        flag = True
+    SolarExported = getSolarExported(fname)
 
     Base = APSUsage.loc[mask]
     adj = getPVWatts()
     report = pd.concat([Base.reset_index(drop=True), APSProduction['APS-Solar-Production'].reset_index(drop=True),
-        SolarExported['Solar-Exported'].reset_index(drop=True), SEProduction['SE-Production'].reset_index(drop=True),
-        adj.reset_index(drop=True)],axis=1)
-    report.name ='report'
+        SolarExported['Solar-Exported'].reset_index(drop=True), adj.reset_index(drop=True)],axis=1)
+    report.name = (fname + '\\report.csv')
+    if(flag):
+        report = pd.concat([SEProduction.reset_index(drop=True)], axis=1)
+    report.to_csv(report.name, index=False)
 
-    list = [APSProduction, SolarExported, SEProduction, report]
-    output(list)
+def TEPAnalysis(fname):
+    adj = getPVWatts()
+    adj.to_csv("Adjusted-Daily-Values.csv", index=False)
 
-APSAnalysis()
+def NVEAnalysis(fname):
+    adj = getPVWatts()
+    adj.to_csv("Adjusted-Daily-Values.csv", index=False)
+
+def SRPAnalysis(fname):
+    adj = getPVWatts()
+    adj.to_csv("Adjusted-Daily-Values.csv", index=False)
+
+def controller(fname):
+    print("What type of analysis would you like to run?")
+    print("1. APS")
+    print("2. TEP")
+    print("3. NVE")
+    print("4. SRP")
+    option = int(input("Number: "))
+    if option == 1:
+        APSAnalysis(fname)
+    if option == 2:
+        TEPAnalysis(fname)
+    if option == 3:
+        NVEAnalysis(fname)
+    if option == 4:
+        SRPAnalysis(fname)
+
+def main():
+    controller(sys.argv[1])
+
+if __name__ =="__main__":
+    main()
+
 """
 TODO
-1. Handle the case where they do not have SE monitoring
-2. Add support for APS Net Metering
-3. Add main controller class.
-4. I want to type run Analysis.py fname analysis_type, where analysis_type is
-    Net Metering or RCP
+1. Manually create the range needed to run getSE(fname, range) for TEP NVE & SRP
 """
