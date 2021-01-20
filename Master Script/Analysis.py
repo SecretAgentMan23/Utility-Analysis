@@ -1,17 +1,17 @@
 import pandas as pd
 import os as os
-from os import path
 import numpy as np
 import sys
-import errno
 from pypvwatts import PVWatts
 
 """
 This is a function that reads a file into a dataframe
 and returns it, skipping row 1 and headers
 """
+
+
 def GetFile(fname):
-    df = pd.read_csv(fname,header=None, skiprows=2, index_col=None)
+    df = pd.read_csv(fname, header=None, skiprows=2, index_col=None)
     return df
 """
 This is a function that takes all the csv files in a folder
@@ -23,7 +23,7 @@ def gather(fname):
         if not os.listdir(fname):
             pass
     except:
-        raise OSError(fname)
+        raise OSError(fname) from None
     list = []
     for files in os.listdir(fname):
         if files.endswith(".csv"):
@@ -35,24 +35,25 @@ def gather(fname):
     try:
         sheet = pd.concat(frame)
     except ValueError:
-        raise ValueError(fname)
+        raise ValueError(fname) from None
     return sheet
 
 """
 This is a function that takes a production data frame, and a range,
 and sums up the daily production number according to the range passed
 """
+
 def ProductionSum(df, r):
-    p = [] #Empty production array
+    p = []   # Empty production array
     i = 0
     while i <= (r["Bill-Start-Date"].count() - 1):
         Start = r['Bill-Start-Date'].values[i]
         End = r['Bill-End-Date'].values[i]
-        #Creates a boolean array of true false values, mask1
+        # Creates a boolean array of true false values, mask1
         mask1 = (pd.to_datetime(df['Date']) >= pd.to_datetime(Start)) & (pd.to_datetime(df['Date']) < pd.to_datetime(End))
         sum = df['Production'].loc[mask1].sum(axis=0)
         p.append(sum)
-        i+=1
+        i += 1
     return p
 
 """
@@ -60,9 +61,9 @@ This is a function that takes our usage dataframe asks the user when the system 
 Then finds the range on our usage sheet where solar production should be present
 """
 def setRange(df):
-    ##Could do some error handling here to make sure correct start date was entered
+    # Could do some error handling here to make sure correct start date was entered
     StartDate = input("When was the system PTO? Enter as DD/MM/YYYY:\n")
-    #Boolean array of true false values
+    # Boolean array of true false values
     mask = df['Bill-Start-Date'] >= StartDate
     r = df[['Bill-Start-Date', 'Bill-End-Date']].loc[mask]
     return r, mask
@@ -145,18 +146,18 @@ Function that reads our usage sheet, labels the columnds for access,
 switches Billed-Amount and Total-Bought for our report
 """
 def getUsage(fname):
-    #If the file does not exist, catch and print "cannot find file"
+    # If the file does not exist, catch and print "cannot find file"
 
     try:
         df = pd.read_csv(fname + '\APS-Usage.csv', header=None, skiprows=1, index_col=None)
     except:
-        raise OSError( fname + "\APS-Usage.csv")
+        raise OSError( fname + "\APS-Usage.csv") from None
 
     cols = list(df)
     cols[5], cols[6] = cols[6], cols[5]
     df = df[cols]
     df.columns = ["Address", "Service-Plan" , "Bill-Start-Date", "Bill-End-Date", "Billing-Days", "Billed-Amount", "Total-Bought"]
-    #Function call here to filter out multiple addresses
+    # Function call here to filter out multiple addresses
     if( (len(df['Address'].unique())) > 1 ):
         sortAddress(df)
 
@@ -190,7 +191,7 @@ def getPVWatts():
 
     eff = float(estprod)/float(yearly)
     adj = monthly*eff
-    adj  = pd.Series(adj, name='adj-daily-total')
+    adj = pd.Series(adj, name='adj-daily-total')
     adj[0] = adj[0]/31
     adj[1] = adj[1]/28
     adj[2] = adj[2]/31
@@ -204,6 +205,8 @@ def getPVWatts():
     adj[10] = adj[10]/30
     adj[11] = adj[11]/31
     return adj
+
+
 """
 This is the function that does a APS RCP analysis, This will be called
 by the model class once it is written.
@@ -225,7 +228,7 @@ def APSAnalysis(fname):
     Base = APSUsage.loc[mask]
     adj = getPVWatts()
     report = pd.concat([Base.reset_index(drop=True), APSProduction['APS-Solar-Production'].reset_index(drop=True),
-        SolarExported['Solar-Exported'].reset_index(drop=True), adj.reset_index(drop=True)],axis=1)
+            SolarExported['Solar-Exported'].reset_index(drop=True), adj.reset_index(drop=True)],axis=1)
     report.name = (fname + '\\report.csv')
     if(flag):
         report = pd.concat([SEProduction.reset_index(drop=True)], axis=1)
@@ -259,10 +262,15 @@ def controller(fname):
     if option == 4:
         SRPAnalysis(fname)
 
+
+"""
+main fucntion
+"""
 def main():
     controller(sys.argv[1])
 
-if __name__ =="__main__":
+
+if __name__ == "__main__":
     main()
 
 """
