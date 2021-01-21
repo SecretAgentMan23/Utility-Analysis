@@ -1,29 +1,26 @@
 import pandas as pd
 import os as os
 import numpy as np
-import sys
 from pypvwatts import PVWatts
 
 """
 This is a function that reads a file into a dataframe
 and returns it, skipping row 1 and headers
 """
-
-
 def GetFile(fname):
     df = pd.read_csv(fname, header=None, skiprows=2, index_col=None)
     return df
+
+
 """
 This is a function that takes all the csv files in a folder
 and concats them all toghether into one big sheet
 """
 def gather(fname):
     #If the folder does not existm, catch and pass folder name up
-    try:
-        if not os.listdir(fname):
-            pass
-    except:
-        raise OSError(fname) from None
+    if not os.path.isdir(fname):
+        parent, file = fname.split("\\")
+        raise NotADirectoryError(file) from None
     list = []
     for files in os.listdir(fname):
         if files.endswith(".csv"):
@@ -38,11 +35,11 @@ def gather(fname):
         raise ValueError(fname) from None
     return sheet
 
+
 """
 This is a function that takes a production data frame, and a range,
 and sums up the daily production number according to the range passed
 """
-
 def ProductionSum(df, r):
     p = []   # Empty production array
     i = 0
@@ -56,6 +53,7 @@ def ProductionSum(df, r):
         i += 1
     return p
 
+
 """
 This is a function that takes our usage dataframe asks the user when the system was PTO'd
 Then finds the range on our usage sheet where solar production should be present
@@ -68,19 +66,15 @@ def setRange(df):
     r = df[['Bill-Start-Date', 'Bill-End-Date']].loc[mask]
     return r, mask
 
+
 """
 Function that takes our range, finds our APS-Production folder, calls gather on the sheets
 Renames all of the columns for accessing, and then sums the production up
 according to our range
 """
 def getAPS(fname, r):
-    try:
-        df = gather(fname + "\APS-Production")
-    except OSError as e:
-        sys.exit("The specified folder '{}' does not exist".format(e))
-    except ValueError as e:
-        sys.exit("The specified folder '{}' does not have any csv files in it".format(e))
 
+    df = gather(fname + "\APS-Production")
     df.columns = ['Date', 'On-Peak-Usage', 'Off-Peak-Usage', 'Other-Peak-Usage', 'Total-Delivered', 'Production', 'AVG-Temp']
     df['Date'] = pd.to_datetime(df['Date'])
     df.sort_values(by='Date',ascending=True, inplace=True)
@@ -91,19 +85,15 @@ def getAPS(fname, r):
     df.to_csv(fname + "\APS-Production.csv", index=False)
     return df
 
+
 """
 Function that takes our range, finds our SE-Production folder, calls gather on the sheets
 Renames all of the columns for accessing, and then sums the production up
 according to our range
 """
 def getSE(fname, r):
-    try:
-        df = gather(fname + "\SE-Production")
-    except OSError as e:
-        sys.exit("The specified folder '{}' does not exist".format(e))
-    except ValueError as e:
-        sys.exit("The specified folder '{}' does not have any csv files in it".format(e))
 
+    df = gather(fname + "\SE-Production")
     df.columns = ['Date','Production(Wh)']
     df["Production"] = df["Production(Wh)"].div(1000)
     df['Date'] = pd.to_datetime(df['Date'])
@@ -116,24 +106,25 @@ def getSE(fname, r):
     df.to_csv(fname + "\SE-Production.csv", index=False)
     return df
 
+
 """
 Function that finds our Solar-Exported folder, calls gather on the sheets
 Renames all of the columns for accessing
 """
 def getSolarExported(fname):
-    try:
-        df = gather(fname + "\Solar-Exported")
-    except OSError as e:
-        sys.exit("The specified folder '{}' does not exist".format(e))
-    except ValueError as e:
-        sys.exit("The specified folder '{}' does not have any csv files in it".format(e))
 
+    df = gather(fname + "\Solar-Exported")
     df.columns = ['Solar-Exported', 'On-Peak','Off-Peak','Month','Range', 'End-Date']
     df.sort_values(by='End-Date', ascending=True, inplace=True)
     df.name = 'SolarExported'
     df.to_csv(fname + "\Solar-Exported.csv", index=False)
     return df
 
+
+"""
+This is a helper function to be implemented to
+remove excess data from the usage sheet
+"""
 def sortAddress(df):
     print("We Found more than one address, which would you like to use?")
     for i in range(0, len(df['Address'].unique() )):
@@ -147,11 +138,10 @@ switches Billed-Amount and Total-Bought for our report
 """
 def getUsage(fname):
     # If the file does not exist, catch and print "cannot find file"
-
     try:
         df = pd.read_csv(fname + '\APS-Usage.csv', header=None, skiprows=1, index_col=None)
-    except:
-        raise OSError( fname + "\APS-Usage.csv") from None
+    except FileNotFoundError:
+        raise FileNotFoundError("APS-Usage.csv") from None
 
     cols = list(df)
     cols[5], cols[6] = cols[6], cols[5]
@@ -166,6 +156,7 @@ def getUsage(fname):
     df.name = 'APSUsage'
     return df
 
+
 """
 Function that gets the pvwatts info for all the arrays, sums up the monthly
 and yealy numbers, then adjusts them. We take our estimated production "estprod"
@@ -174,16 +165,16 @@ and divide it by pvwatts.ac_annual, and call it eff. monthly = monthly * eff
 def getPVWatts():
     PVWatts.api_key = 'qkk2DRRxcBpTZXA13qOGFlwouL9ZWQaLZxKjZCdd'
     address = input("Enter the HO address: ")
-    ratio = float(input("Enter the DC/AC ratio:"))
+    ratio = float(input("Enter the DC/AC ratio: "))
     estprod = float(input("Enter out estimated yearly production for the system: "))
 
-    numArrays = int(input("Enter the number total number of unique arays:"))
+    numArrays = int(input("Enter the number total number of unique arays: "))
     monthly = [0,0,0,0,0,0,0,0,0,0,0,0]
     yearly = 0
     for i in range(0, numArrays):
-        s_c = float(input("Enter the system size in kWh for array {}:".format(i)))
-        tilt = int(input("Enter the tilt of array {}:".format(i)))
-        azimuth = int(input("Enter the azimuth of array {}:".format(i)))
+        s_c = float(input("Enter the system size in kWh for array {}:".format(i+1)))
+        tilt = int(input("Enter the tilt of array {}:".format(i+1)))
+        azimuth = int(input("Enter the azimuth of array {}:".format(i+1)))
         result = PVWatts.request(system_capacity=s_c, module_type=1, array_type=1, azimuth=azimuth,
         tilt=tilt, dataset="tmy2", losses=9,address=address,dc_ac_ratio=ratio, gcr=.4, inv_eff=99.5)
         yearly += int(result.ac_annual)
@@ -212,10 +203,8 @@ This is the function that does a APS RCP analysis, This will be called
 by the model class once it is written.
 """
 def APSAnalysis(fname):
-    try:
-        APSUsage = getUsage(fname)
-    except OSError as e:
-        sys.exit("The file '{}' does not exist, or is the incorrect file type".format(e))
+    APSUsage = getUsage(fname)
+        # sys.exit("The file '{}' does not exist".format(e))
     Range, mask = setRange(APSUsage)
     APSProduction = getAPS(fname, Range)
     flag = False
@@ -246,34 +235,9 @@ def SRPAnalysis(fname):
     adj = getPVWatts()
     adj.to_csv("Adjusted-Daily-Values.csv", index=False)
 
-def controller(fname):
-    print("What type of analysis would you like to run?")
-    print("1. APS")
-    print("2. TEP")
-    print("3. NVE")
-    print("4. SRP")
-    option = int(input("Number: "))
-    if option == 1:
-        APSAnalysis(fname)
-    if option == 2:
-        TEPAnalysis(fname)
-    if option == 3:
-        NVEAnalysis(fname)
-    if option == 4:
-        SRPAnalysis(fname)
-
-
-"""
-main fucntion
-"""
-def main():
-    controller(sys.argv[1])
-
-
-if __name__ == "__main__":
-    main()
-
 """
 TODO
 1. Manually create the range needed to run getSE(fname, range) for TEP NVE & SRP
+2. Extract getPVWatts input lines to controller.py, PTOprompt in setRange as well
+    We want all input in controller.py, for everything.
 """
